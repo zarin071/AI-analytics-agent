@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: AI Analytics Agent API
+  version: 1.0.0
+  description: |
+    Ingestion + query + AI API for the AI Analytics Agent.
+    Auth: `Authorization: Bearer <key>`. Public keys (pk_*) may only call
+    /v1/track and /v1/identify; secret keys (sk_*) may call everything.
+servers:
+  - url: http://localhost:4000
+security:
+  - bearerAuth: []
+
+paths:
+  /v1/track:
+    post:
+      summary: Ingest a batch of events (1–500)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  items: { $ref: "#/components/schemas/TrackedEvent" }
+      responses:
+        "200": { description: "Accepted (possibly with per-event rejections)", content: { application/json: { schema: { $ref: "#/components/schemas/IngestOutcome" } } } }
+        "401": { description: Invalid key }
+        "422": { description: Entire batch rejected }
+
+  /v1/identify:
+    post:
+      summary: Link anonymous id to user id and set profile traits
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string }
+                anonymousId: { type: string }
+                traits: { type: object, additionalProperties: true }
+      responses: { "200": { description: OK } }
+
+  /v1/query/segment:
+    post:
+      summary: Trend/breakdown query (events, users, sum, avg)
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/SegmentationQuery" } } } }
+      responses: { "200": { description: Time series rows } }
+
+  /v1/query/funnel:
+    post:
+      summary: Ordered conversion funnel (2–10 steps)
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/FunnelDefinition" } } } }
+      responses: { "200": { description: Funnel result } }
+
+  /v1/query/retention:
+    post:
+      summary: Cohort retention triangle
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/RetentionDefinition" } } } }
+      responses: { "200": { description: Retention cohorts } }
+
+  /v1/query/journeys:
+    post:
+      summary: Top user paths from/to an anchor event
+      responses: { "200": { description: Sankey nodes + edges } }
+
+  /v1/query/adoption:
+    post:
+      summary: Feature adoption metrics
+      responses: { "200": { description: Adoption result } }
+
+  /v1/taxonomy:
+    get:
+      summary: Event catalog with inferred property schemas
+      responses: { "200": { description: Taxonomy entries } }
+
+  /v1/users/{userId}:
+    get:
+      summary: User profile
+      parameters: [{ name: userId, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Profile }, "404": { description: Unknown user } }
+
+  /v1/users/{userId}/events:
+    get:
+      summary: Recent events for a user (activity feed)
+      parameters: [{ name: userId, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Events } }
+
+  /v1/cohorts:
+    post:
+      summary: Create + compute a cohort
+      responses: { "200": { description: "{ id, members }" } }
+
+  /v1/releases:
+    post: { summary: Register a release (version, releasedAt, notes), responses: { "200": { description: OK } } }
+
+  /v1/experiments:
+    post: { summary: Register an experiment, responses: { "200": { description: OK } } }
+
+  /v1/experiments/{key}/readout:
+    get:
+      summary: Variant stats + significance for an experiment
+      parameters: [{ name: key, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Readout } }
+
+  /v1/reports:
+    get: { summary: List saved reports, responses: { "200": { description: Reports } } }
+    post: { summary: Save a report/dashboard definition, responses: { "200": { description: "{ id }" } } }
+
+  /v1/ai/ask:
+    post:
+      summary: Ask the AI agent a natural-language question
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [question], properties: { question: { type: string } } }
+      responses: { "200": { description: Markdown insight grounded in tool calls } }
+
+  /v1/ai/summary:
+    post: { summary: Generate an executive summary for the last N days, responses: { "200": { description: Insight } } }
+
+  /v1/ai/recommend:
+    post: { summary: AI UX/product recommendations grounded in funnels & journeys, responses: { "200": { description: Insight } } }
+
+  /v1/ai/anomalies:
+    post: { summary: Scan for anomalies and explain them, responses: { "200": { description: Findings + insight } } }
+
+  /v1/insights:
+    get: { summary: Recent AI insights, responses: { "200": { description: Insights } } }
+
+  /health:
+    get: { summary: Liveness, security: [], responses: { "200": { description: OK } } }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  schemas:
+    TrackedEvent:
+      type: object
+      required: [name, timestamp]
+      properties:
+        name: { type: string, description: "object_action snake_case", example: checkout_completed }
+        userId: { type: string }
+        anonymousId: { type: string }
+        timestamp: { type: string, format: date-time }
+        properties: { type: object, additionalProperties: true }
+        context: { type: object, additionalProperties: true }
+        release: { type: string }
+        experiment:
+          type: object
+          properties: { key: { type: string }, variant: { type: string } }
+    IngestOutcome:
+      type: object
+      properties:
+        accepted: { type: integer }
+        rejected:
+          type: array
+          items:
+            type: object
+            properties:
+              event: { type: string }
+              issues: { type: array, items: { type: object } }
+    SegmentationQuery:
+      type: object
+      required: [event, range, interval, measure]
+      properties:
+        event: { type: string }
+        range: { $ref: "#/components/schemas/DateRange" }
+        interval: { enum: [hour, day, week, month] }
+        measure: { enum: [events, users, sum, avg] }
+        measureProperty: { type: string }
+        groupBy: { type: string, example: properties.plan }
+    FunnelDefinition:
+      type: object
+      required: [steps, range, conversionWindowHours]
+      properties:
+        steps:
+          type: array
+          minItems: 2
+          maxItems: 10
+          items: { type: object, required: [event], properties: { event: { type: string } } }
+        range: { $ref: "#/components/schemas/DateRange" }
+        conversionWindowHours: { type: number }
+    RetentionDefinition:
+      type: object
+      required: [cohortEvent, returnEvent, range, interval, periods]
+      properties:
+        cohortEvent: { type: string }
+        returnEvent: { type: string, description: "'$any' for any event" }
+        range: { $ref: "#/components/schemas/DateRange" }
+        interval: { enum: [day, week, month] }
+        periods: { type: integer }
+    DateRange:
+      type: object
+      required: [from, to]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }

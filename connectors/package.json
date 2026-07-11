@@ -1,0 +1,13 @@
+{
+  "name": "@ai-analytics/connectors",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": { "@ai-analytics/agent": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.6.0", "vitest": "^2.1.0" }
+}

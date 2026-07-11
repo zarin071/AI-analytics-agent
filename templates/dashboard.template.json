@@ -1,0 +1,27 @@
+{
+  "$comment": "Template: a Dashboard Builder definition. Save via POST /v1/reports with kind='dashboard'. Tiles reuse the exact query payloads of /v1/query/*.",
+  "kind": "dashboard",
+  "name": "Growth Overview",
+  "definition": {
+    "layout": [
+      { "id": "wau", "x": 0, "y": 0, "w": 3, "h": 2 },
+      { "id": "signup_trend", "x": 3, "y": 0, "w": 9, "h": 4 },
+      { "id": "core_funnel", "x": 0, "y": 4, "w": 6, "h": 5 },
+      { "id": "weekly_retention", "x": 6, "y": 4, "w": 6, "h": 5 }
+    ],
+    "tiles": {
+      "wau": { "type": "metric", "label": "Weekly Active Users",
+               "query": { "event": "$any", "measure": "users", "interval": "week" } },
+      "signup_trend": { "type": "segmentation",
+               "query": { "event": "user_signed_up", "measure": "users", "interval": "day",
+                          "groupBy": "context.utm.source" } },
+      "core_funnel": { "type": "funnel",
+               "query": { "steps": [ { "event": "signup_started" }, { "event": "user_signed_up" },
+                                     { "event": "onboarding_completed" } ],
+                          "conversionWindowHours": 72 } },
+      "weekly_retention": { "type": "retention",
+               "query": { "cohortEvent": "user_signed_up", "returnEvent": "$any",
+                          "interval": "week", "periods": 8 } }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$comment": "Template: declare an event up front (optional — taxonomy also auto-registers). POST the body to /v1/taxonomy or commit under templates/events/ and sync in CI.",
+  "name": "checkout_completed",
+  "object": "checkout",
+  "action": "completed",
+  "category": "revenue",
+  "description": "User finished payment and the order was created.",
+  "property_schema": {
+    "revenue":  { "type": "number",  "description": "Order total in `currency` units" },
+    "currency": { "type": "string",  "examples": ["USD", "EUR"] },
+    "items":    { "type": "number",  "description": "Line item count" },
+    "coupon":   { "type": "string",  "description": "Optional coupon code" }
+  },
+  "status": "active"
+}

@@ -1,0 +1,13 @@
+# Hourly anomaly watch — detect, explain, and alert when it matters.
+name: anomaly-watch
+trigger:
+  cron: "0 * * * *"
+steps:
+  - kind: engine.anomalies    # → AnomalyEngine.scan()
+    with: { days: 2 }
+  - kind: ai.explain          # → InsightsAgent.explainAnomalies(findings)
+    when: "findings.length > 0 && maxSeverity != 'info'"
+deliver:
+  - connector: slack
+    when: "severity in ['warning','critical']"
+  - store: ai_insights
