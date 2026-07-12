@@ -1,0 +1,11 @@
+# Weekly executive report — runs Monday 08:00 project-local time.
+name: weekly-executive-report
+trigger:
+  cron: "0 8 * * MON"
+steps:
+  - kind: ai.summary          # → InsightsAgent.executiveSummary()
+    with:
+      periodDays: 7
+deliver:
+  - connector: slack          # posts insight via onInsight hook
+  - store: ai_insights        # always persisted; dashboard "Saved Reports" feed

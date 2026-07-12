@@ -1,0 +1,40 @@
+{
+  "name": "@ai-analytics/sdk",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": "./dist/index.js",
+    "./react": "./dist/adapters/react.js",
+    "./nextjs": "./dist/adapters/nextjs.js",
+    "./vue": "./dist/adapters/vue.js",
+    "./angular": "./dist/adapters/angular.js",
+    "./svelte": "./dist/adapters/svelte.js",
+    "./react-native": "./dist/adapters/react-native.js",
+    "./node": "./dist/adapters/node.js",
+    "./express": "./dist/adapters/express.js",
+    "./fastify": "./dist/adapters/fastify.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "vue": ">=3",
+    "svelte": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "vue": { "optional": true },
+    "svelte": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

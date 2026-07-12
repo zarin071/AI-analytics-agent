@@ -1,0 +1,12 @@
+# Weekly taxonomy hygiene — fast model, cheap, keeps event naming clean.
+name: taxonomy-review
+trigger:
+  cron: "0 9 * * TUE"
+steps:
+  - kind: ai.complete
+    with:
+      prompt: taxonomy-review      # prompts/taxonomy-review.md
+      fast: true
+      input: taxonomy              # serialized event_taxonomy for the project
+deliver:
+  - store: ai_insights

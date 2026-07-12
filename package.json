@@ -1,0 +1,23 @@
+{
+  "name": "ai-analytics-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portable, production-ready AI analytics platform (Mixpanel-class) with an AI insights agent.",
+  "license": "MIT",
+  "packageManager": "pnpm@9.0.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @ai-analytics/api dev\" \"pnpm --filter @ai-analytics/dashboard dev\"",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "node database/migrate.mjs",
+    "storybook": "pnpm --filter @ai-analytics/dashboard storybook"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
