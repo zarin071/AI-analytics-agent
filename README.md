@@ -23,7 +23,8 @@ Project → Analytics SDK → Analytics Agent → Analytics Database → Dashboa
 10. [The dashboard](#10-the-dashboard)
 11. [Connectors & scheduled AI workflows](#11-connectors--scheduled-ai-workflows)
 12. [Deploying to production](#12-deploying-to-production)
-13. [Troubleshooting](#13-troubleshooting)
+13. [Integration walkthroughs: GitHub Pages & local development](#13-integration-walkthroughs-github-pages--local-development)
+14. [Troubleshooting](#14-troubleshooting)
 
 ---
 
@@ -366,7 +367,122 @@ CI is included (`.github/workflows/ci.yml`): typecheck + tests against real Post
 
 ---
 
-## 13. Troubleshooting
+## 13. Integration walkthroughs: GitHub Pages & local development
+
+Two concrete, step-by-step setups: wiring this agent into a **static site hosted on GitHub Pages**, and into a **website running locally**. Both follow the same shape — run the agent's API somewhere reachable from the website, then drop the SDK snippet into the site's pages. The agent never crawls or auto-discovers anything; it only sees events the site actively sends it.
+
+### 13.1 GitHub Pages (or any static site in a GitHub repo)
+
+GitHub Pages only serves static files — it can't run the agent's API, Postgres, or AI layer. So the agent backend runs elsewhere, and only the tracking snippet ships to GitHub Pages.
+
+**Step 1 — Deploy the agent backend somewhere reachable from the internet.**
+Pick any host that can run a long-lived container + Postgres (GitHub Pages cannot): Render, Railway, Fly.io, a VPS, or your own Kubernetes cluster (`kubernetes/`).
+
+```bash
+docker build -t ai-analytics . && docker run -d --env-file .env -p 4000:4000 ai-analytics
+```
+
+Set in `.env` before deploying:
+```
+ANALYTICS_DATABASE_URL=postgres://...             # managed Postgres
+ANALYTICS_PUBLIC_KEYS=pk_live_xxxxxxxx             # generate a real random key
+ANALYTICS_SECRET_KEYS=sk_live_xxxxxxxx
+ANALYTICS_JWT_SECRET=<random 32+ chars>
+ANALYTICS_ALLOWED_ORIGINS=https://<your-username>.github.io
+ANTHROPIC_API_KEY=sk-ant-...
+```
+`ANALYTICS_ALLOWED_ORIGINS` must match your Pages URL exactly (including a custom domain, if you use one) — the browser blocks the request otherwise.
+
+Confirm it's reachable: `curl https://your-deployed-agent.com/health`
+
+**Step 2 — Add the tracking snippet to the site in your GitHub repo.**
+
+Plain HTML site — edit `index.html` (and any other page), before `</body>`:
+```html
+<script type="module">
+  import { Analytics } from "https://cdn.jsdelivr.net/npm/@ai-analytics/sdk";
+  const analytics = Analytics.init({
+    apiKey: "pk_live_xxxxxxxx",              // public key — safe to expose, write-only
+    host: "https://your-deployed-agent.com",
+  });
+  analytics.page();
+  document.querySelectorAll("[data-track]").forEach((el) =>
+    el.addEventListener("click", () => analytics.track(el.dataset.track))
+  );
+</script>
+```
+Tag elements you care about, e.g. `<a href="/resume.pdf" data-track="resume_downloaded">`.
+
+React / Next.js / Vue / Astro static export — install `@ai-analytics/sdk` and use the matching adapter (§4) instead, then build as usual; GitHub Pages just serves the built output. The public key is safe to bake into the client bundle.
+
+**Step 3 — Commit and push.**
+```bash
+git add index.html && git commit -m "Add analytics tracking" && git push
+```
+GitHub Pages redeploys automatically (or your Pages Actions workflow runs).
+
+**Step 4 — Verify.** Visit your live GitHub Pages URL, click around, then check **Event Explorer** in the agent's dashboard for the incoming events.
+
+**Step 5 — Ask the AI.**
+```bash
+curl -X POST https://your-deployed-agent.com/v1/ai/ask \
+  -H "authorization: Bearer sk_live_xxxxxxxx" -H "content-type: application/json" \
+  -d '{"question":"Which pages get the most traffic and what is my resume download rate?"}'
+```
+
+### 13.2 A website running locally (localhost dev server)
+
+Here everything runs on one machine — no deployment needed.
+
+**Step 1 — Start the agent locally.**
+```bash
+git clone <this repo> && cd AI-analytics-agent
+cp .env.example .env        # set ANTHROPIC_API_KEY, defaults are fine for the rest
+docker compose up
+```
+This gives you API → `http://localhost:4000`, dashboard → `http://localhost:3000`, using the dev keys `pk_local_dev_public` / `sk_local_dev_secret` already in `.env.example`.
+
+**Step 2 — Serve your local website and note its origin.**
+E.g. `npx http-server ./my-site -p 5500` → origin is `http://localhost:5500`. Serve it, don't open it via `file://` — `file://` origins are unreliable for CORS/fetch.
+
+**Step 3 — Allow that origin.** In the agent's `.env`:
+```
+ANALYTICS_ALLOWED_ORIGINS=http://localhost:5500
+```
+Restart the agent (`docker compose restart api`, or re-run `pnpm dev`) after changing this.
+
+**Step 4 — Add the snippet to your local site**, pointing at the local API:
+```html
+<script type="module">
+  import { Analytics } from "@ai-analytics/sdk"; // or the CDN URL if not using a bundler
+  const analytics = Analytics.init({
+    apiKey: "pk_local_dev_public",
+    host: "http://localhost:4000",
+    debug: true,                 // logs each tracked event to the console
+  });
+  analytics.page();
+</script>
+```
+
+**Step 5 — Browse the site, then verify.** Open `http://localhost:5500`, click around, then check `http://localhost:3000` → **Event Explorer**.
+
+**Step 6 — Ask the AI.**
+```bash
+curl -X POST localhost:4000/v1/ai/ask \
+  -H "authorization: Bearer sk_local_dev_secret" -H "content-type: application/json" \
+  -d '{"question":"How many page views did I get and which page has the most clicks?"}'
+```
+
+### 13.3 Quick reference
+
+| Scenario | Agent runs | Website's `host` points at | CORS origin to allow |
+|---|---|---|---|
+| GitHub Pages site | Render/Railway/Fly/VPS/K8s | `https://your-deployed-agent.com` | `https://<user>.github.io` (or custom domain) |
+| Local website | `docker compose up` on your machine | `http://localhost:4000` | `http://localhost:<your-dev-port>` |
+
+---
+
+## 14. Troubleshooting
 
 | Symptom | Likely cause / fix |
 |---|---|
